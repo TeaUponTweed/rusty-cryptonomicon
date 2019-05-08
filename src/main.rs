@@ -9,23 +9,23 @@ use serde::Deserialize;
 
 
 
-// #[serde(rename_all = "camelCase")]
 #[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
 struct TradingPair {
     exchange: String,
-    quoteAsset: String,
-    baseAsset: String,
+    quote_asset: String,
+    base_asset: String,
     rate: f32,
     capacity: f32,
 }
 
 
 
-fn load_trading_pairs(path: &Path) -> TradingPair {
+fn load_trading_pairs(path: &Path) -> Vec<TradingPair> {
     let mut file = File::open(path).expect("Trading pairs file not found! Exiting");
     let mut data = String::new();
     file.read_to_string(&mut data).unwrap();
-    let trading_pairs: TradingPair =
+    let trading_pairs: Vec<TradingPair> =
         serde_json::from_str(&data).expect("JSON was not well-formatted");
     trading_pairs
 }
@@ -33,10 +33,9 @@ fn load_trading_pairs(path: &Path) -> TradingPair {
 fn optimize_rate(trading_pair_file: &str, starting_asset: &str, final_asset: &str) {
     let trading_pairs = load_trading_pairs(Path::new(trading_pair_file));
     println!("Converting {}->{}", starting_asset, final_asset);
-    println!("{:?}", trading_pairs);
-    // for tp in trading_pairs {
-    //     println!("{:?}", tp);
-    // }
+    for tp in trading_pairs {
+        println!("{:?}", tp);
+    }
 }
 
 fn main() {
