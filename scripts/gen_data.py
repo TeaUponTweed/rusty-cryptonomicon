@@ -1,3 +1,5 @@
+#!/usr/bin/env python
+
 import json
 import random
 
@@ -5,6 +7,7 @@ import random
 _ASSETS=list('ABCDEFG')
 _EXCHANGES=list('1234')
 _DROP_PROB=0.1
+
 
 def main():
     values = {asset: 100*random.random() for asset in _ASSETS}
@@ -19,7 +22,7 @@ def main():
                         continue
                     # noise exchange rate to make things interesting
                     exchange_rate = (values[asset]+random.random())/(values[other_asset] + random.random())
-                    # produce a bi-derectional trading pair
+                    # produce a bi-derectional trading pair (should this be noised?)
                     yield {
                         'exchange': exchange,
                         'quoteAsset': asset,
