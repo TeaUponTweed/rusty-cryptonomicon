@@ -1,12 +1,11 @@
+use std::collections::{HashMap,HashSet};
 use std::fs::File;
 use std::io::prelude::*;
 use std::path::Path;
 
 use clap::{App, Arg, SubCommand};
-
+use itertools::Itertools;
 use serde::Deserialize;
-// use serde_json::Result;
-
 
 
 #[derive(Debug, Deserialize)]
@@ -38,6 +37,48 @@ fn optimize_rate(trading_pair_file: &str, starting_asset: &str, final_asset: &st
     }
 }
 
+fn find_connected_component(connections: &HashMap<String, HashSet<String>>, to_explore_start: String) -> HashSet<String> {
+    let mut have_explored = HashSet::new();
+    // let mut to_explore: Vec<String> = [to_explore].iter().collect();
+    let mut to_explore = Vec::new();
+    to_explore.push(to_explore_start);
+
+    while let Some(a) = to_explore.pop() {
+        if let Some(next) = connections.get(&a) {
+            for unexplored in next.difference(&have_explored) {
+                to_explore.push(unexplored.to_string());
+            }
+        }
+        have_explored.insert(a);
+    }
+    have_explored
+}
+
+
+fn find_connected_components(trading_pairs: &Vec<TradingPair>) -> Vec<HashSet<String>> {
+    let assets = {
+        let mut assets = HashMap::new();
+        for (base, tps) in &trading_pairs.into_iter().group_by(|tp| tp.base_asset.clone()) {
+            let quote_assets : HashSet<String> = tps.into_iter().map(|tp| tp.quote_asset.clone()).collect();
+            assets.insert(base, quote_assets);
+        }
+        assets
+    };
+    let mut connected_components = Vec::new();
+    let mut to_explore : HashSet<String> = assets.keys().map(|x| x.clone()).collect();
+    // let mut to_explore : HashSet<String> = assets.keys().collect();
+
+    while let Some(asset) = to_explore.iter().next() {
+        let cc = find_connected_component(&assets, asset.to_string());
+        to_explore = to_explore.difference(&cc).map(|x| x.clone()).collect();
+        // for a in cc.iter() {
+        //     to_explore.remove(&a);
+        // }
+
+        connected_components.push(cc);
+    }
+    connected_components
+}
 fn main() {
     let matches = App::new("cryptoptim")
         .subcommand(SubCommand::with_name("net")
@@ -101,5 +142,23 @@ fn main() {
             }
         },
         _ => println!("Use either \"net\" or \"rate\" subcommand. See help (-h) for details."),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    // Note this useful idiom: importing names from outer (for mod tests) scope.
+    use super::*;
+
+    #[test]
+    fn test_add() {
+        assert_eq!(add(1, 2), 3);
+    }
+
+    #[test]
+    fn test_bad_add() {
+        // This assert would fire and test will fail.
+        // Please note, that private functions can be tested too!
+        assert_eq!(bad_add(1, 2), 3);
     }
 }
