@@ -10,13 +10,13 @@ cargo build --release
 ```
 This will place binaries in the `./target` folder
 
-## Running
-# Input Data Generation
-Sample test data can be created by running
+## Input Data Generation
+Sample test data can be created by running (requires python3)
 ```bash
-python gen_data.py > $TRADING_PAIRS
+./scripts/gen_data.py > $TRADING_PAIRS
 ```
-# Optimiztion tool
+
+## Optimiztion Tool
 To run the optimization tool, assuming it has been built, run
 ```bash
 ./target/release/cryptoptim {net,rate} $TRADING_PAIRS ...
