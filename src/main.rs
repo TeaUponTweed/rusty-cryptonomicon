@@ -45,7 +45,9 @@ fn find_connected_component(connections: &HashMap<String, HashSet<String>>, to_e
     while let Some(a) = to_explore.pop() {
         if let Some(next) = connections.get(&a) {
             for unexplored in next.difference(&have_explored) {
-                to_explore.push(unexplored.to_string());
+                if unexplored != &a {
+                    to_explore.push(unexplored.to_string());
+                }
             }
         }
         have_explored.insert(a);
@@ -70,6 +72,9 @@ fn find_connected_components(trading_pairs: &Vec<TradingPair>) -> Vec<HashSet<St
     while let Some(asset) = to_explore.iter().next() {
         let cc = find_connected_component(&assets, asset.to_string());
         to_explore = to_explore.difference(&cc).map(|x| x.clone()).collect();
+        println!("{:?}", cc);
+        println!("{:?}", to_explore);
+        println!("========");
         // for a in cc.iter() {
         //     to_explore.remove(&a);
         // }
@@ -146,12 +151,18 @@ fn main() {
 
 #[cfg(test)]
 mod tests {
-    // Note this useful idiom: importing names from outer (for mod tests) scope.
     use super::*;
 
     #[test]
-    fn test_cc() {
+    fn test_cc_simple() {
         let tps = vec![
+            TradingPair {
+                exchange: "1".to_string(),
+                quote_asset: "B".to_string(),
+                base_asset: "A".to_string(),
+                rate: 1.0,
+                capacity: 1.0,
+            },
             TradingPair {
                 exchange: "1".to_string(),
                 quote_asset: "A".to_string(),
@@ -161,7 +172,21 @@ mod tests {
             },
             TradingPair {
                 exchange: "1".to_string(),
+                quote_asset: "C".to_string(),
+                base_asset: "B".to_string(),
+                rate: 1.0,
+                capacity: 1.0,
+            },
+            TradingPair {
+                exchange: "1".to_string(),
                 quote_asset: "B".to_string(),
+                base_asset: "C".to_string(),
+                rate: 1.0,
+                capacity: 1.0,
+            },
+            TradingPair {
+                exchange: "1".to_string(),
+                quote_asset: "D".to_string(),
                 base_asset: "C".to_string(),
                 rate: 1.0,
                 capacity: 1.0,
@@ -177,6 +202,60 @@ mod tests {
         let ccs = find_connected_components(&tps);
         println!("{:?}", ccs);
         assert_eq!(ccs.len(), 1);
+        assert_eq!(ccs[0].len(), 4);
+    }
+
+    #[test]
+    fn test_cc_two_components() {
+        let tps = vec![
+            TradingPair {
+                exchange: "1".to_string(),
+                quote_asset: "B".to_string(),
+                base_asset: "A".to_string(),
+                rate: 1.0,
+                capacity: 1.0,
+            },
+            TradingPair {
+                exchange: "1".to_string(),
+                quote_asset: "A".to_string(),
+                base_asset: "B".to_string(),
+                rate: 1.0,
+                capacity: 1.0,
+            },
+            TradingPair {
+                exchange: "1".to_string(),
+                quote_asset: "C".to_string(),
+                base_asset: "A".to_string(),
+                rate: 1.0,
+                capacity: 1.0,
+            },
+            TradingPair {
+                exchange: "1".to_string(),
+                quote_asset: "A".to_string(),
+                base_asset: "C".to_string(),
+                rate: 1.0,
+                capacity: 1.0,
+            },
+
+            TradingPair {
+                exchange: "1".to_string(),
+                quote_asset: "D".to_string(),
+                base_asset: "E".to_string(),
+                rate: 1.0,
+                capacity: 1.0,
+            },
+            TradingPair {
+                exchange: "1".to_string(),
+                quote_asset: "E".to_string(),
+                base_asset: "D".to_string(),
+                rate: 1.0,
+                capacity: 1.0,
+            },
+        ];
+        let ccs = find_connected_components(&tps);
+        println!("{:?}", ccs);
+        assert_eq!(ccs.len(), 2);
         assert_eq!(ccs[0].len(), 3);
+        assert_eq!(ccs[1].len(), 2);
     }
 }
