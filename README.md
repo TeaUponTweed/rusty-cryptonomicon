@@ -22,6 +22,17 @@ To run the optimization tool, assuming it has been built, run
 ```bash
 ./target/release/cryptoptim {net,rate} $TRADING_PAIRS ...
 ```
+
+e.g.
+
+```bash
+./target/release/cryptoptim rate data/test_data.json B D
+~> 
+Converting B->D
+Optimal conversion rate: 2.3419385 D from 1 B by taking path:
+B -> A -> E -> G -> D
+```
+
 More specific information can be found by running
 ```bash
 ./target/release/cryptoptim {net,rate} -h
@@ -32,5 +43,4 @@ More specific information can be found by running
 * The code is very "Stringly" typed with regards to the Asset names - I'm sure there is a better data model, but I stuck with this path for better or worse
 
 ## TODO
-* Implement rate optimization
 * Implement net optimization
