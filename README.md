@@ -31,3 +31,4 @@ More specific information can be found by running
 * Implement rate optimization
 * Implement net optimization
 * Enforce that asset cannot be traded with itself
+* Enforce that all pairs are bi-directions
