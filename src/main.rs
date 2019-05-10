@@ -77,9 +77,8 @@ struct RateOptimData {
 }
 
 
-fn do_optimize_rate(trading_pairs: &Vec<TradingPair>, starting_asset: String, final_asset: String) -> Vec<String> {
+fn do_optimize_rate(trading_pairs: &Vec<TradingPair>, starting_asset: String, final_asset: String) -> (f32, Vec<String>) {
     let connections = get_connections(&trading_pairs);
-    // let assets : HashSet<_> = trading_pairs.iter().map(|x| (x.base_asset.clone())).collect();
 
     // map each trading edge to its rate
     let rate_map : HashMap<(String, String), f32> = trading_pairs.iter().map(|x| {
@@ -95,11 +94,9 @@ fn do_optimize_rate(trading_pairs: &Vec<TradingPair>, starting_asset: String, fi
         path: vec![starting_asset],
         cumulative_rate: 1.0
     };
-
-    // memo.insert(starting_asset, );
     let mut to_explore = vec![init_data];
-    // to_explore.push(starting_asset);
 
+    // Find optimal rate by exaustive search with memoization
     while let Some(data) = to_explore.pop() {
         let current_asset = data.path.last().unwrap();
         if !memo.contains_key(current_asset) || memo.get(current_asset).unwrap().cumulative_rate > data.cumulative_rate {
@@ -118,8 +115,8 @@ fn do_optimize_rate(trading_pairs: &Vec<TradingPair>, starting_asset: String, fi
             memo.insert(current_asset.to_string(), data);
         }
     }
-    let path = memo.get(&final_asset).unwrap().path.clone();
-    path
+    let final_data = memo.get(&final_asset).unwrap();
+    (final_data.cumulative_rate, final_data.path.clone())
 }
 
 fn find_connected_component(connections: &HashMap<String, HashSet<String>>, to_explore_start: String) -> HashSet<String> {
