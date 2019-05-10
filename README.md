@@ -1,4 +1,5 @@
 ## Asssumtions
+* Currency can be effortlessly moved between exchanges, the most favorable rate of all exchanges is used
 * The tool will not exploit positive cycles when optimizing rate, i.e. a crypto currency will only be visited once
 * There are not implicit bi-directional trading pairs e.g. ETH->BTC and BTC->ETH will both be found in the trading pairs file for a given exchange
 * Do not need to account for discretization of crypto-currency / this is encoded in the exchange rate
