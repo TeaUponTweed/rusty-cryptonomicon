@@ -30,7 +30,13 @@ fn load_trading_pairs(path: &Path) -> Vec<TradingPair> {
 
 fn optimize_rate(trading_pair_file: &str, starting_asset: &str, final_asset: &str) {
     let trading_pairs = load_trading_pairs(Path::new(trading_pair_file));
-
+    // check that no currencies can be traded for themselves
+    for tp in trading_pairs.iter() {
+        if tp.base_asset == tp.quote_asset {
+            eprintln!("Asset {} can be traded for itself on exchange {}!", tp.base_asset, tp.exchange);
+            exit(1);
+        }
+    }
     // check that A->B implies B->A
     if !trading_pairs_reversible(&trading_pairs) {
         eprintln!("Not all trading pairs reversive!");
@@ -61,6 +67,45 @@ fn optimize_rate(trading_pair_file: &str, starting_asset: &str, final_asset: &st
     println!("Converting {}->{}", starting_asset, final_asset);
     for tp in trading_pairs {
         println!("{:?}", tp);
+    }
+}
+
+struct RateOptimData {
+    path: Vec<String>,
+    cumulative_rate : f32,
+}
+
+
+fn do_optimize_rate(trading_pairs: &Vec<TradingPair>, starting_asset: String, final_asset: String) -> Vec<String> {
+    let connections = get_connections(&trading_pairs);
+    let assets : HashSet<_> = trading_pairs.iter().map(|x| (x.base_asset.clone())).collect();
+
+    // map each trading edge to its rate
+    let rate_map : HashMap<(String, String), f32> = trading_pairs.iter().map(|x| {
+        (
+            (x.base_asset.clone(), x.quote_asset.clone()),
+            x.rate
+        )
+    }).collect();
+
+    let mut memo = HashMap::new();
+    memo.insert(starting_asset, RateOptimData{
+        path: Vec::new(),
+        cumulative_rate: 1.0
+    });
+
+    // initialize problem
+    let mut to_explore = Vec::new();
+    for &next_asset in connections.get(&starting_asset).unwrap() {
+        // let tp = 
+        let rate = rate_map.get(&(starting_asset.to_string(), next_asset.to_string())).unwrap();
+        memo.insert(next_asset, RateOptimData{
+            path: vec![starting_asset, next_asset],
+            cumulative_rate: 1.0/rate
+        });
+        if next_asset != final_asset {
+            to_explore.push(next_asset);
+        }
     }
 }
 
