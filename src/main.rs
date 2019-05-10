@@ -82,34 +82,35 @@ fn find_connected_component(connections: &HashMap<String, HashSet<String>>, to_e
     have_explored
 }
 
+// Create a mapping from asset -> {next assets}
+fn get_connections(trading_pairs: &Vec<TradingPair>) -> HashMap<String, HashSet<String>> {
+    let mut connections : HashMap<String, HashSet<String>> = HashMap::new();
+    for tp in trading_pairs {
+        let from = tp.base_asset.clone();
+        let to = tp.quote_asset.clone();
+        if let Some(reachable_nodes) = connections.get(&from) {
+            let mut reachable_nodes : HashSet<String> = reachable_nodes.iter().map(|x| x.clone()).collect();
+            reachable_nodes.insert(to);
+            connections.insert(from, reachable_nodes);
+        }
+        else {
+            let mut reachable_nodes = HashSet::new();
+            reachable_nodes.insert(to);
+            connections.insert(from, reachable_nodes);
+        }
+    }
+    connections
+}
 
 fn find_connected_components(trading_pairs: &Vec<TradingPair>) -> Vec<HashSet<String>> {
-    // Find a mapping from asset -> {next assets}
-    let assets = {
-        let mut assets : HashMap<String, HashSet<String>> = HashMap::new();
-        for tp in trading_pairs {
-            let base = tp.base_asset.clone();
-            let quote = tp.quote_asset.clone();
-            if let Some(next_assets) = assets.get(&base) {
-                let mut wakka : HashSet<String> = next_assets.iter().map(|x| x.clone()).collect();
-                wakka.insert(quote);
-                assets.insert(base, wakka);
-            }
-            else {
-                let mut next_assets = HashSet::new();
-                next_assets.insert(quote);
-                assets.insert(base, next_assets);
-            }
-        }
-        assets
-    };
+    let connections = get_connections(trading_pairs);
 
-    // Find connected components in graph
+    // Find connected components in graph using BFS
     let mut connected_components = Vec::new();
-    let mut to_explore : HashSet<String> = assets.keys().map(|x| x.clone()).collect();
+    let mut to_explore : HashSet<String> = connections.keys().map(|x| x.clone()).collect();
 
     while let Some(asset) = to_explore.iter().next() {
-        let cc = find_connected_component(&assets, asset.to_string());
+        let cc = find_connected_component(&connections, asset.to_string());
         to_explore = to_explore.difference(&cc).map(|x| x.clone()).collect();
         connected_components.push(cc);
     }
