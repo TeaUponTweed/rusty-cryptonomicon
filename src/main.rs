@@ -4,7 +4,6 @@ use std::io::prelude::*;
 use std::path::Path;
 
 use clap::{App, Arg, SubCommand};
-use itertools::Itertools;
 use serde::Deserialize;
 
 
@@ -31,6 +30,30 @@ fn load_trading_pairs(path: &Path) -> Vec<TradingPair> {
 
 fn optimize_rate(trading_pair_file: &str, starting_asset: &str, final_asset: &str) {
     let trading_pairs = load_trading_pairs(Path::new(trading_pair_file));
+
+    // check that A->B implies B->A
+    if !trading_pairs_reversible(&trading_pairs) {
+        panic!("Not all trading pairs reversive!");
+    }
+    // check that starting asset is in graph
+    let assets : HashSet<_> = trading_pairs.iter().map(|x| (x.base_asset.clone())).collect();
+    if !assets.contains(starting_asset) {
+        panic!("Asset {} not in trading pairs!", starting_asset);
+    }
+    // check that fina; asset is in graph
+    if !assets.contains(final_asset) {
+        panic!("Asset {} not in trading pairs!", final_asset);
+    }
+    // check if there exists a path from A->B
+    let ccs = find_connected_components(&trading_pairs);
+    if ccs.len() > 1 {
+        for cc in ccs {
+            if cc.contains(starting_asset) && !cc.contains(final_asset) {
+                panic!("No trading path from {} to {}!", starting_asset, final_asset);
+            }
+        }
+    }
+
     println!("Converting {}->{}", starting_asset, final_asset);
     for tp in trading_pairs {
         println!("{:?}", tp);
@@ -57,32 +80,49 @@ fn find_connected_component(connections: &HashMap<String, HashSet<String>>, to_e
 
 
 fn find_connected_components(trading_pairs: &Vec<TradingPair>) -> Vec<HashSet<String>> {
+    // Find a mapping from asset -> {next assets}
     let assets = {
-        let mut assets = HashMap::new();
-        for (base, tps) in &trading_pairs.into_iter().group_by(|tp| tp.base_asset.clone()) {
-            let quote_assets : HashSet<String> = tps.into_iter().map(|tp| tp.quote_asset.clone()).collect();
-            assets.insert(base, quote_assets);
+        let mut assets : HashMap<String, HashSet<String>> = HashMap::new();
+        for tp in trading_pairs {
+            let base = tp.base_asset.clone();
+            let quote = tp.quote_asset.clone();
+            if let Some(next_assets) = assets.get(&base) {
+                let mut wakka : HashSet<String> = next_assets.iter().map(|x| x.clone()).collect();
+                wakka.insert(quote);
+                assets.insert(base, wakka);
+            }
+            else {
+                let mut next_assets = HashSet::new();
+                next_assets.insert(quote);
+                assets.insert(base, next_assets);
+            }
         }
         assets
     };
+
+    // Find connected components in graph
     let mut connected_components = Vec::new();
     let mut to_explore : HashSet<String> = assets.keys().map(|x| x.clone()).collect();
-    // let mut to_explore : HashSet<String> = assets.keys().collect();
 
     while let Some(asset) = to_explore.iter().next() {
         let cc = find_connected_component(&assets, asset.to_string());
         to_explore = to_explore.difference(&cc).map(|x| x.clone()).collect();
-        println!("{:?}", cc);
-        println!("{:?}", to_explore);
-        println!("========");
-        // for a in cc.iter() {
-        //     to_explore.remove(&a);
-        // }
-
         connected_components.push(cc);
     }
     connected_components
 }
+
+fn trading_pairs_reversible(trading_pairs: &Vec<TradingPair>) -> bool {
+    let pairs : HashSet<_> = trading_pairs.iter().map(|x| (x.quote_asset.clone(), x.base_asset.clone())).collect();
+    for (q, b) in pairs.iter() {
+        if !pairs.contains(&(b.to_string(), q.to_string())) {
+            return false;
+        }
+    }
+    true
+}
+
+
 fn main() {
     let matches = App::new("cryptoptim")
         .subcommand(SubCommand::with_name("net")
@@ -148,6 +188,7 @@ fn main() {
         _ => println!("Use either \"net\" or \"rate\" subcommand. See help (-h) for details."),
     }
 }
+
 
 #[cfg(test)]
 mod tests {
@@ -252,10 +293,57 @@ mod tests {
                 capacity: 1.0,
             },
         ];
-        let ccs = find_connected_components(&tps);
+        let ccs = {
+            let mut ccs = find_connected_components(&tps);
+            ccs.sort_by_key(|x| x.len());
+            ccs
+        };
         println!("{:?}", ccs);
         assert_eq!(ccs.len(), 2);
-        assert_eq!(ccs[0].len(), 3);
-        assert_eq!(ccs[1].len(), 2);
+        assert_eq!(ccs[0].len(), 2);
+        assert_eq!(ccs[1].len(), 3);
+    }
+    #[test]
+    fn test_reversive_components() {
+        let mut tps = vec![
+            TradingPair {
+                exchange: "1".to_string(),
+                quote_asset: "B".to_string(),
+                base_asset: "A".to_string(),
+                rate: 1.0,
+                capacity: 1.0,
+            },
+            TradingPair {
+                exchange: "1".to_string(),
+                quote_asset: "A".to_string(),
+                base_asset: "B".to_string(),
+                rate: 1.0,
+                capacity: 1.0,
+            },
+            TradingPair {
+                exchange: "1".to_string(),
+                quote_asset: "C".to_string(),
+                base_asset: "A".to_string(),
+                rate: 1.0,
+                capacity: 1.0,
+            },
+            TradingPair {
+                exchange: "1".to_string(),
+                quote_asset: "A".to_string(),
+                base_asset: "C".to_string(),
+                rate: 1.0,
+                capacity: 1.0,
+            },
+        ];
+        assert!(trading_pairs_reversible(&tps));
+        tps.push(TradingPair {
+            exchange: "1".to_string(),
+            quote_asset: "D".to_string(),
+            base_asset: "E".to_string(),
+            rate: 1.0,
+            capacity: 1.0,
+        });
+        assert!(!trading_pairs_reversible(&tps));
+
     }
 }
