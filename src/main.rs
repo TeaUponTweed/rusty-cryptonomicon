@@ -253,53 +253,31 @@ fn main() {
 #[cfg(test)]
 mod tests {
     use super::*;
+    fn make_trading_pair_pair(n1: String, n2: String, rate: f32, capacity: f32) -> Vec<TradingPair> {
+        vec![
+            TradingPair {
+                exchange: "1".to_string(),
+                quote_asset: n2.to_string(),
+                base_asset: n1.to_string(),
+                rate: rate,
+                capacity: capacity,
+            },
+            TradingPair {
+                exchange: "1".to_string(),
+                quote_asset: n1.to_string(),
+                base_asset: n2.to_string(),
+                rate: 1.0/rate,
+                capacity: capacity,
+            },
+        ]
+    }
 
     #[test]
     fn test_cc_simple() {
-        let tps = vec![
-            TradingPair {
-                exchange: "1".to_string(),
-                quote_asset: "B".to_string(),
-                base_asset: "A".to_string(),
-                rate: 1.0,
-                capacity: 1.0,
-            },
-            TradingPair {
-                exchange: "1".to_string(),
-                quote_asset: "A".to_string(),
-                base_asset: "B".to_string(),
-                rate: 1.0,
-                capacity: 1.0,
-            },
-            TradingPair {
-                exchange: "1".to_string(),
-                quote_asset: "C".to_string(),
-                base_asset: "B".to_string(),
-                rate: 1.0,
-                capacity: 1.0,
-            },
-            TradingPair {
-                exchange: "1".to_string(),
-                quote_asset: "B".to_string(),
-                base_asset: "C".to_string(),
-                rate: 1.0,
-                capacity: 1.0,
-            },
-            TradingPair {
-                exchange: "1".to_string(),
-                quote_asset: "D".to_string(),
-                base_asset: "C".to_string(),
-                rate: 1.0,
-                capacity: 1.0,
-            },
-            TradingPair {
-                exchange: "1".to_string(),
-                quote_asset: "C".to_string(),
-                base_asset: "D".to_string(),
-                rate: 1.0,
-                capacity: 1.0,
-            },
-        ];
+        let tp1 = make_trading_pair_pair("A".to_string(), "B".to_string(), 1.0, 1.0);
+        let tp2 = make_trading_pair_pair("B".to_string(), "C".to_string(), 1.0, 1.0);
+        let tp3 = make_trading_pair_pair("C".to_string(), "D".to_string(), 1.0, 1.0);
+        let tps: Vec<TradingPair> = tp1.into_iter().chain(tp2.into_iter().chain(tp3.into_iter())).collect();
         let ccs = find_connected_components(&tps);
         println!("{:?}", ccs);
         assert_eq!(ccs.len(), 1);
@@ -308,51 +286,10 @@ mod tests {
 
     #[test]
     fn test_cc_two_components() {
-        let tps = vec![
-            TradingPair {
-                exchange: "1".to_string(),
-                quote_asset: "B".to_string(),
-                base_asset: "A".to_string(),
-                rate: 1.0,
-                capacity: 1.0,
-            },
-            TradingPair {
-                exchange: "1".to_string(),
-                quote_asset: "A".to_string(),
-                base_asset: "B".to_string(),
-                rate: 1.0,
-                capacity: 1.0,
-            },
-            TradingPair {
-                exchange: "1".to_string(),
-                quote_asset: "C".to_string(),
-                base_asset: "A".to_string(),
-                rate: 1.0,
-                capacity: 1.0,
-            },
-            TradingPair {
-                exchange: "1".to_string(),
-                quote_asset: "A".to_string(),
-                base_asset: "C".to_string(),
-                rate: 1.0,
-                capacity: 1.0,
-            },
-
-            TradingPair {
-                exchange: "1".to_string(),
-                quote_asset: "D".to_string(),
-                base_asset: "E".to_string(),
-                rate: 1.0,
-                capacity: 1.0,
-            },
-            TradingPair {
-                exchange: "1".to_string(),
-                quote_asset: "E".to_string(),
-                base_asset: "D".to_string(),
-                rate: 1.0,
-                capacity: 1.0,
-            },
-        ];
+        let tp1 = make_trading_pair_pair("A".to_string(), "B".to_string(), 1.0, 1.0);
+        let tp2 = make_trading_pair_pair("B".to_string(), "C".to_string(), 1.0, 1.0);
+        let tp3 = make_trading_pair_pair("D".to_string(), "E".to_string(), 1.0, 1.0);
+        let tps: Vec<TradingPair> = tp1.into_iter().chain(tp2.into_iter().chain(tp3.into_iter())).collect();
         let ccs = {
             let mut ccs = find_connected_components(&tps);
             ccs.sort_by_key(|x| x.len());
@@ -363,39 +300,15 @@ mod tests {
         assert_eq!(ccs[0].len(), 2);
         assert_eq!(ccs[1].len(), 3);
     }
+
     #[test]
     fn test_reversive_components() {
-        let mut tps = vec![
-            TradingPair {
-                exchange: "1".to_string(),
-                quote_asset: "B".to_string(),
-                base_asset: "A".to_string(),
-                rate: 1.0,
-                capacity: 1.0,
-            },
-            TradingPair {
-                exchange: "1".to_string(),
-                quote_asset: "A".to_string(),
-                base_asset: "B".to_string(),
-                rate: 1.0,
-                capacity: 1.0,
-            },
-            TradingPair {
-                exchange: "1".to_string(),
-                quote_asset: "C".to_string(),
-                base_asset: "A".to_string(),
-                rate: 1.0,
-                capacity: 1.0,
-            },
-            TradingPair {
-                exchange: "1".to_string(),
-                quote_asset: "A".to_string(),
-                base_asset: "C".to_string(),
-                rate: 1.0,
-                capacity: 1.0,
-            },
-        ];
+        let tp1 = make_trading_pair_pair("A".to_string(), "B".to_string(), 1.0, 1.0);
+        let tp2 = make_trading_pair_pair("B".to_string(), "C".to_string(), 1.0, 1.0);
+        let mut tps: Vec<TradingPair> = tp1.into_iter().chain(tp2.into_iter()).collect();
+
         assert!(trading_pairs_reversible(&tps));
+
         tps.push(TradingPair {
             exchange: "1".to_string(),
             quote_asset: "D".to_string(),
@@ -404,6 +317,29 @@ mod tests {
             capacity: 1.0,
         });
         assert!(!trading_pairs_reversible(&tps));
+    }
 
+    #[test]
+    fn test_rate_optim() {
+        let tp1 = make_trading_pair_pair("A".to_string(), "B".to_string(), 0.5, 1.0);
+        let tp2 = make_trading_pair_pair("B".to_string(), "C".to_string(), 0.1, 1.0);
+        let tp3 = make_trading_pair_pair("C".to_string(), "D".to_string(), 0.2, 1.0);
+        let mut tps: Vec<TradingPair> = tp1.into_iter().chain(tp2.into_iter().chain(tp3.into_iter())).collect();
+
+        let (rate, path) = do_optimize_rate(&tps, "A".to_string(), "B".to_string());
+        assert_eq!(rate, 0.5);
+        assert_eq!(path, vec!["A".to_string(), "B".to_string()]);
+
+        let (rate, path) = do_optimize_rate(&tps, "A".to_string(), "D".to_string());
+        assert_eq!(rate, 0.5*0.1*0.2);
+        assert_eq!(path, vec!["A".to_string(), "B".to_string(), "C".to_string(), "D".to_string()]);
+
+        let mut tp4 = make_trading_pair_pair("A".to_string(), "E".to_string(), 1.0, 1.0);
+        let mut tp5 = make_trading_pair_pair("E".to_string(), "D".to_string(), 0.5*0.1*0.2 - 0.0001, 1.0);
+        tps.append(&mut tp4);
+        tps.append(&mut tp5);
+        let (rate, path) = do_optimize_rate(&tps, "A".to_string(), "D".to_string());
+        assert_eq!(rate, 0.5*0.1*0.2-0.0001);
+        assert_eq!(path, vec!["A".to_string(), "E".to_string(), "D".to_string()]);
     }
 }
