@@ -39,7 +39,6 @@ fn optimize_rate(trading_pair_file: &str, starting_asset: &str, final_asset: &st
 
 fn find_connected_component(connections: &HashMap<String, HashSet<String>>, to_explore_start: String) -> HashSet<String> {
     let mut have_explored = HashSet::new();
-    // let mut to_explore: Vec<String> = [to_explore].iter().collect();
     let mut to_explore = Vec::new();
     to_explore.push(to_explore_start);
 
@@ -151,14 +150,33 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_add() {
-        assert_eq!(add(1, 2), 3);
-    }
-
-    #[test]
-    fn test_bad_add() {
-        // This assert would fire and test will fail.
-        // Please note, that private functions can be tested too!
-        assert_eq!(bad_add(1, 2), 3);
+    fn test_cc() {
+        let tps = vec![
+            TradingPair {
+                exchange: "1".to_string(),
+                quote_asset: "A".to_string(),
+                base_asset: "B".to_string(),
+                rate: 1.0,
+                capacity: 1.0,
+            },
+            TradingPair {
+                exchange: "1".to_string(),
+                quote_asset: "B".to_string(),
+                base_asset: "C".to_string(),
+                rate: 1.0,
+                capacity: 1.0,
+            },
+            TradingPair {
+                exchange: "1".to_string(),
+                quote_asset: "C".to_string(),
+                base_asset: "D".to_string(),
+                rate: 1.0,
+                capacity: 1.0,
+            },
+        ];
+        let ccs = find_connected_components(&tps);
+        println!("{:?}", ccs);
+        assert_eq!(ccs.len(), 1);
+        assert_eq!(ccs[0].len(), 3);
     }
 }
