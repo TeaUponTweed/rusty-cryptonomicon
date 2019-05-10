@@ -2,6 +2,7 @@ use std::collections::{HashMap,HashSet};
 use std::fs::File;
 use std::io::prelude::*;
 use std::path::Path;
+use std::process::exit;
 
 use clap::{App, Arg, SubCommand};
 use serde::Deserialize;
@@ -18,7 +19,6 @@ struct TradingPair {
 }
 
 
-
 fn load_trading_pairs(path: &Path) -> Vec<TradingPair> {
     let mut file = File::open(path).expect("Trading pairs file not found! Exiting");
     let mut data = String::new();
@@ -33,23 +33,27 @@ fn optimize_rate(trading_pair_file: &str, starting_asset: &str, final_asset: &st
 
     // check that A->B implies B->A
     if !trading_pairs_reversible(&trading_pairs) {
-        panic!("Not all trading pairs reversive!");
+        eprintln!("Not all trading pairs reversive!");
+        exit(1);
     }
     // check that starting asset is in graph
     let assets : HashSet<_> = trading_pairs.iter().map(|x| (x.base_asset.clone())).collect();
     if !assets.contains(starting_asset) {
-        panic!("Asset {} not in trading pairs!", starting_asset);
+        eprintln!("Asset {} not in trading pairs!", starting_asset);
+        exit(1);
     }
     // check that fina; asset is in graph
     if !assets.contains(final_asset) {
-        panic!("Asset {} not in trading pairs!", final_asset);
+        eprintln!("Asset {} not in trading pairs!", final_asset);
+        exit(1);
     }
     // check if there exists a path from A->B
     let ccs = find_connected_components(&trading_pairs);
     if ccs.len() > 1 {
         for cc in ccs {
             if cc.contains(starting_asset) && !cc.contains(final_asset) {
-                panic!("No trading path from {} to {}!", starting_asset, final_asset);
+                eprintln!("No trading path from {} to {}!", starting_asset, final_asset);
+                exit(1);
             }
         }
     }
@@ -179,13 +183,13 @@ fn main() {
         ("net", Some(net_matches)) => {
             let quantity = net_matches.value_of("asset quantity").unwrap();
             if let Some(quantity) = quantity.parse::<f32>().ok() {
-                println!("'cryptoptim net' was used with quantity = {:?}", quantity);
+                eprintln!("'cryptoptim net' was used with quantity = {:?}", quantity);
             }
             else {
-                println!("Failed to parse \"{}\" into a float! Exiting now", quantity);
+                eprintln!("Failed to parse \"{}\" into a float!", quantity);
             }
         },
-        _ => println!("Use either \"net\" or \"rate\" subcommand. See help (-h) for details."),
+        _ => eprintln!("Use either \"net\" or \"rate\" subcommand. See help (-h) for details."),
     }
 }
 
