@@ -30,3 +30,4 @@ More specific information can be found by running
 * Check for disconnected components in graph
 * Implement rate optimization
 * Implement net optimization
+* Enforce that asset cannot be traded with itself
