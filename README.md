@@ -40,7 +40,7 @@ More specific information can be found by running
 ```
 
 ## Notes
-* The net optimization is not optmimal - it uses a greedy rate maximizing heuristic bounded by capacity. I believe this could be solved efficiently using a linear program
+* The net calculation is not optmimal - it uses a greedy rate maximizing heuristic bounded by capacity. I believe this could be solved efficiently using a linear program
 * The code is very "Stringly" typed with regards to the Asset names - I'm sure there is a better data model, but I stuck with this path for better or worse
 
 ## TODO
