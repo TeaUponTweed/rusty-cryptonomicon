@@ -65,9 +65,9 @@ fn optimize_rate(trading_pair_file: &str, starting_asset: &str, final_asset: &st
     }
 
     println!("Converting {}->{}", starting_asset, final_asset);
-    for tp in trading_pairs {
-        println!("{:?}", tp);
-    }
+    let (rate, path) = do_optimize_rate(&trading_pairs, starting_asset.to_string(), final_asset.to_string());
+    println!("Optimal conversion rate: {} {} from 1 {} by taking path:", 1.0/rate, final_asset, starting_asset);
+    println!("{}", path.join(" -> "));
 }
 
 #[derive(Debug)]
@@ -80,13 +80,18 @@ struct RateOptimData {
 fn do_optimize_rate(trading_pairs: &Vec<TradingPair>, starting_asset: String, final_asset: String) -> (f32, Vec<String>) {
     let connections = get_connections(&trading_pairs);
 
-    // map each trading edge to its rate
-    let rate_map : HashMap<(String, String), f32> = trading_pairs.iter().map(|x| {
-        (
-            (x.base_asset.clone(), x.quote_asset.clone()),
-            x.rate
-        )
-    }).collect();
+    // map each trading edge to its *best* rate
+    let mut rate_map : HashMap<(String, String), f32>= HashMap::new();
+    for tp in trading_pairs.iter() {
+        if let Some(&rate) = rate_map.get(&(tp.base_asset.clone(), tp.quote_asset.clone())) {
+            if tp.rate < rate {
+                rate_map.insert((tp.base_asset.clone(), tp.quote_asset.clone()), tp.rate);
+            }
+        }
+        else {
+            rate_map.insert((tp.base_asset.clone(), tp.quote_asset.clone()), tp.rate);
+        }
+    }
 
     // initialize problem
     let mut memo : HashMap<String, RateOptimData> = HashMap::new();
