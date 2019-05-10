@@ -70,6 +70,7 @@ fn optimize_rate(trading_pair_file: &str, starting_asset: &str, final_asset: &st
     }
 }
 
+#[derive(Debug)]
 struct RateOptimData {
     path: Vec<String>,
     cumulative_rate : f32,
@@ -78,7 +79,7 @@ struct RateOptimData {
 
 fn do_optimize_rate(trading_pairs: &Vec<TradingPair>, starting_asset: String, final_asset: String) -> Vec<String> {
     let connections = get_connections(&trading_pairs);
-    let assets : HashSet<_> = trading_pairs.iter().map(|x| (x.base_asset.clone())).collect();
+    // let assets : HashSet<_> = trading_pairs.iter().map(|x| (x.base_asset.clone())).collect();
 
     // map each trading edge to its rate
     let rate_map : HashMap<(String, String), f32> = trading_pairs.iter().map(|x| {
@@ -88,25 +89,37 @@ fn do_optimize_rate(trading_pairs: &Vec<TradingPair>, starting_asset: String, fi
         )
     }).collect();
 
-    let mut memo = HashMap::new();
-    memo.insert(starting_asset, RateOptimData{
-        path: Vec::new(),
-        cumulative_rate: 1.0
-    });
-
     // initialize problem
-    let mut to_explore = Vec::new();
-    for &next_asset in connections.get(&starting_asset).unwrap() {
-        // let tp = 
-        let rate = rate_map.get(&(starting_asset.to_string(), next_asset.to_string())).unwrap();
-        memo.insert(next_asset, RateOptimData{
-            path: vec![starting_asset, next_asset],
-            cumulative_rate: 1.0/rate
-        });
-        if next_asset != final_asset {
-            to_explore.push(next_asset);
+    let mut memo : HashMap<String, RateOptimData> = HashMap::new();
+    let init_data = RateOptimData{
+        path: vec![starting_asset],
+        cumulative_rate: 1.0
+    };
+
+    // memo.insert(starting_asset, );
+    let mut to_explore = vec![init_data];
+    // to_explore.push(starting_asset);
+
+    while let Some(data) = to_explore.pop() {
+        let current_asset = data.path.last().unwrap();
+        if !memo.contains_key(current_asset) || memo.get(current_asset).unwrap().cumulative_rate > data.cumulative_rate {
+            for next_asset in connections.get(current_asset).unwrap() {
+                if !data.path.contains(next_asset){
+                    let incremental_rate = rate_map.get(&(current_asset.to_string(), next_asset.to_string())).unwrap();
+                    let cumulative_rate = incremental_rate * data.cumulative_rate;
+                    let mut path : Vec<String> = data.path.iter().map(|x| (x.clone())).collect();
+                    path.push(next_asset.to_string());
+                    to_explore.push(RateOptimData{
+                        path: path,
+                        cumulative_rate: cumulative_rate,
+                    });
+                }
+            }
+            memo.insert(current_asset.to_string(), data);
         }
     }
+    let path = memo.get(&final_asset).unwrap().path.clone();
+    path
 }
 
 fn find_connected_component(connections: &HashMap<String, HashSet<String>>, to_explore_start: String) -> HashSet<String> {
