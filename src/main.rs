@@ -82,22 +82,33 @@ struct RateOptimData {
     cumulative_rate : f32,
 }
 
+fn is_subset<T: PartialEq>(a: &Vec<T>, b: &Vec<T>) -> bool {
+    for aa in a.iter() {
+        if !b.contains(aa) {
+            return false;
+        }
+    }
+    return true;
+}
 
 fn do_optimize_rate(trading_pairs: &Vec<TradingPair>, starting_asset: String, final_asset: String) -> (f32, Vec<String>) {
     let connections = get_connections(&trading_pairs);
 
     // map each trading edge to its *best* rate
-    let mut rate_map : HashMap<(String, String), f32>= HashMap::new();
-    for tp in trading_pairs.iter() {
-        if let Some(&rate) = rate_map.get(&(tp.base_asset.clone(), tp.quote_asset.clone())) {
-            if tp.rate < rate {
+    let rate_map = {
+        let mut rate_map : HashMap<(String, String), f32>= HashMap::new();
+        for tp in trading_pairs.iter() {
+            if let Some(&rate) = rate_map.get(&(tp.base_asset.clone(), tp.quote_asset.clone())) {
+                if tp.rate < rate {
+                    rate_map.insert((tp.base_asset.clone(), tp.quote_asset.clone()), tp.rate);
+                }
+            }
+            else {
                 rate_map.insert((tp.base_asset.clone(), tp.quote_asset.clone()), tp.rate);
             }
         }
-        else {
-            rate_map.insert((tp.base_asset.clone(), tp.quote_asset.clone()), tp.rate);
-        }
-    }
+        rate_map
+    };
 
     // initialize problem
     let mut memo : HashMap<String, RateOptimData> = HashMap::new();
@@ -106,23 +117,29 @@ fn do_optimize_rate(trading_pairs: &Vec<TradingPair>, starting_asset: String, fi
         cumulative_rate: 1.0
     };
     let mut to_explore = vec![init_data];
-
     // Find optimal rate by exaustive search with memoization
     while let Some(data) = to_explore.pop() {
         let current_asset = data.path.last().unwrap();
-        if !memo.contains_key(current_asset) || (memo.get(current_asset).unwrap().cumulative_rate > data.cumulative_rate) {
-            for next_asset in connections.get(current_asset).unwrap() {
-                if !data.path.contains(next_asset){
-                    let incremental_rate = rate_map.get(&(current_asset.to_string(), next_asset.to_string())).unwrap();
-                    let cumulative_rate = incremental_rate * data.cumulative_rate;
-                    let mut path : Vec<String> = data.path.iter().map(|x| (x.clone())).collect();
-                    path.push(next_asset.to_string());
-                    to_explore.push(RateOptimData{
-                        path: path,
-                        cumulative_rate: cumulative_rate,
-                    });
-                }
+        if memo.contains_key(current_asset) {
+            let memo_data = memo.get(current_asset).unwrap();
+            if memo_data.cumulative_rate <= data.cumulative_rate
+            && is_subset(&memo_data.path, &data.path) {
+                continue;
             }
+        }
+        for next_asset in connections.get(current_asset).unwrap() {
+            if !data.path.contains(next_asset){
+                let incremental_rate = rate_map.get(&(current_asset.to_string(), next_asset.to_string())).unwrap();
+                let cumulative_rate = incremental_rate * data.cumulative_rate;
+                let mut path : Vec<String> = data.path.iter().map(|x| (x.clone())).collect();
+                path.push(next_asset.to_string());
+                to_explore.push(RateOptimData{
+                    path: path,
+                    cumulative_rate: cumulative_rate,
+                });
+            }
+        }
+        if !memo.contains_key(current_asset) || (memo.get(current_asset).unwrap().cumulative_rate > data.cumulative_rate) {
             memo.insert(current_asset.to_string(), data);
         }
     }
