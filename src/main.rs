@@ -28,8 +28,7 @@ fn load_trading_pairs(path: &Path) -> Vec<TradingPair> {
     trading_pairs
 }
 
-fn optimize_rate(trading_pair_file: &str, starting_asset: &str, final_asset: &str) {
-    let trading_pairs = load_trading_pairs(Path::new(trading_pair_file));
+fn validate_input(trading_pairs: &Vec<TradingPair>, starting_asset: &str, final_asset: &str) {
     // check that no currencies can be traded for themselves
     for tp in trading_pairs.iter() {
         if tp.base_asset == tp.quote_asset {
@@ -63,9 +62,16 @@ fn optimize_rate(trading_pair_file: &str, starting_asset: &str, final_asset: &st
             }
         }
     }
+}
 
-    println!("Converting {}->{}", starting_asset, final_asset);
+fn optimize_rate(trading_pair_file: &str, starting_asset: &str, final_asset: &str) {
+    let trading_pairs = load_trading_pairs(Path::new(trading_pair_file));
+
+    validate_input(&trading_pairs, starting_asset, final_asset);
+
+    println!("Converting {} -> {}", starting_asset, final_asset);
     let (rate, path) = do_optimize_rate(&trading_pairs, starting_asset.to_string(), final_asset.to_string());
+
     println!("Optimal conversion rate: {} {} from 1 {} by taking path:", 1.0/rate, final_asset, starting_asset);
     println!("{}", path.join(" -> "));
 }
@@ -104,7 +110,7 @@ fn do_optimize_rate(trading_pairs: &Vec<TradingPair>, starting_asset: String, fi
     // Find optimal rate by exaustive search with memoization
     while let Some(data) = to_explore.pop() {
         let current_asset = data.path.last().unwrap();
-        if !memo.contains_key(current_asset) || memo.get(current_asset).unwrap().cumulative_rate > data.cumulative_rate {
+        if !memo.contains_key(current_asset) || (memo.get(current_asset).unwrap().cumulative_rate > data.cumulative_rate) {
             for next_asset in connections.get(current_asset).unwrap() {
                 if !data.path.contains(next_asset){
                     let incremental_rate = rate_map.get(&(current_asset.to_string(), next_asset.to_string())).unwrap();
