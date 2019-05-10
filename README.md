@@ -26,7 +26,9 @@ To run the optimization tool, assuming it has been built, run
 e.g.
 
 ```bash
-$ ./target/release/cryptoptim rate data/test_data.json B D
+./target/release/cryptoptim rate data/test_data.json B D
+```
+```
 Converting B->D
 Optimal conversion rate: 2.3419385 D from 1 B by taking path:
 B -> A -> E -> G -> D
