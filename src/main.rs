@@ -76,7 +76,7 @@ fn optimize_rate(trading_pair_file: &str, starting_asset: &str, final_asset: &st
     println!("Converting {} -> {}", starting_asset, final_asset);
     let (rate, path) = do_optimize_rate(&trading_pairs, &starting_asset.to_string(), &final_asset.to_string());
 
-    println!("Optimal conversion rate: {} {} from 1 {} by taking path:", 1.0/rate, final_asset, starting_asset);
+    println!("Optimal conversion rate: {} {} from 1 {} by taking path:", rate, final_asset, starting_asset);
     println!("{}", path.join(" -> "));
 }
 
@@ -147,17 +147,17 @@ fn do_optimize_rate(trading_pairs: &Vec<TradingPair>, starting_asset: &String, f
         let current_asset = data.path.last().unwrap();
         if memo.contains_key(current_asset) {
             let memo_data = memo.get(current_asset).unwrap();
-            if memo_data.cumulative_rate <= data.cumulative_rate
+            if memo_data.cumulative_rate >= data.cumulative_rate
             && is_subset(&memo_data.path, &data.path) {
                 continue;
             }
         }
-        // println!("{:?}", connections);
-        // println!("{:?}", current_asset);
+        println!("{:?}", connections);
+        println!("{:?}", current_asset);
         for next_asset in connections.get(current_asset).unwrap() {
             if !data.path.contains(next_asset){
                 let incremental_rate = rate_map.get(&(current_asset.to_string(), next_asset.to_string())).unwrap();
-                let cumulative_rate = incremental_rate * data.cumulative_rate;
+                let cumulative_rate = 1.0/incremental_rate * data.cumulative_rate;
                 let mut path : Vec<String> = data.path.iter().map(|x| (x.clone())).collect();
                 path.push(next_asset.to_string());
                 to_explore.push(RateOptimData{
@@ -173,7 +173,7 @@ fn do_optimize_rate(trading_pairs: &Vec<TradingPair>, starting_asset: &String, f
         }
         else {
             let memo_data = memo.get(current_asset).unwrap();
-            if (memo_data.cumulative_rate > data.cumulative_rate)
+            if (memo_data.cumulative_rate < data.cumulative_rate)
                 || ((memo_data.cumulative_rate == data.cumulative_rate) && (data.path.len() < memo_data.path.len())) {
                 memo.insert(current_asset.to_string(), data);
             }
@@ -198,18 +198,8 @@ struct Trade {
     from_amount: f32,
 }
 
-// fn remove_best_pair(trading_pairs: &Vec<TradingPair>. from: String, to: String) -> Option<(TradingPair, Vec<TradingPair>>)> {
-//     let best_trading_pair = trading_pairs.iter().filter(|x| x.base_asset == from && x.quote_asset == to).min_by_key(|x| x.rate);
-//     match best_trading_pair {
-//         Some(best_trading_pair) => Some((best_trading_pair, trading_pairs.iter().filter(|x| != best_trading_pair).collect())),
-//         None => None,
-//     }
-// }
 
 fn get_best_pair(trading_pairs: &Vec<TradingPair>, from: &String, to: &String) -> Option<TradingPair> {
-    // println!("{:?}", from);
-    // println!("{:?}", to);
-    // println!("{:?}", load_trading_pairs);
     if let Some(tp) = trading_pairs.iter().filter(|x| &x.base_asset == from && &x.quote_asset == to).min_by(|a,b| a.rate.partial_cmp(&b.rate).unwrap()) {
         Some(tp.clone())
     } else {
@@ -230,10 +220,13 @@ fn do_optimize_net(trading_pairs: &Vec<TradingPair>, starting_asset: &String, st
 
     let mut net_currency = 0.0;
     while let Some(data) = assets_with_movable_currency.pop() {
-        println!("========");
-        println!("{:?}", data);
         if data.amount <= 0.0 {
             continue
+        }
+
+        let assets : HashSet<_> = trading_pairs.iter().map(|x| (x.base_asset.clone())).collect();
+        if !assets.contains(&data.asset) {
+            continue;
         }
 
         if &data.asset == final_asset {
@@ -245,12 +238,9 @@ fn do_optimize_net(trading_pairs: &Vec<TradingPair>, starting_asset: &String, st
         }
 
         let (_, path) = do_optimize_rate(&trading_pairs, &data.asset, &final_asset);
-        println!("trading_pairs={:?}", trading_pairs);
         println!("path={:?}", path);
         let tp = get_best_pair(&trading_pairs, &path[0], &path[1]).unwrap();
-        println!("best tp={:?}", tp);
         let amount_moved = tp.capacity.min(data.amount);
-        println!("amount_moved={:?}", amount_moved);
         let trade = Trade{
             exchange: tp.exchange.clone(),
             to: tp.quote_asset.clone(),
@@ -259,7 +249,6 @@ fn do_optimize_net(trading_pairs: &Vec<TradingPair>, starting_asset: &String, st
             from_amount: amount_moved,
 
         };
-        println!("{:?}", trade);
         trades.push(trade);
 
         if tp.capacity < data.amount {
@@ -272,11 +261,11 @@ fn do_optimize_net(trading_pairs: &Vec<TradingPair>, starting_asset: &String, st
             asset: tp.quote_asset.clone(),
             amount: amount_moved/tp.rate,
         });
-        println!("assets_with_movable_currency={:?}", assets_with_movable_currency);
         trading_pairs = trading_pairs.iter().filter(|x| {
             !(x.exchange == tp.exchange && ((x.quote_asset == tp.quote_asset && x.base_asset  == tp.base_asset)
                                         ||  (x.base_asset  == tp.quote_asset && x.quote_asset == tp.base_asset)))
         }).map(|x| x.clone()).collect();
+        println!("trading_pairs={:?}", trading_pairs);
 
     }
     (net_currency, trades)
@@ -496,19 +485,19 @@ mod tests {
         let mut tps: Vec<TradingPair> = tp1.into_iter().chain(tp2.into_iter().chain(tp3.into_iter())).collect();
 
         let (rate, path) = do_optimize_rate(&tps, &"A".to_string(), &"B".to_string());
-        assert_eq!(rate, 0.5);
+        assert_eq!(rate, 1.0/0.5);
         assert_eq!(path, vec!["A".to_string(), "B".to_string()]);
 
         let (rate, path) = do_optimize_rate(&tps, &"A".to_string(), &"D".to_string());
-        assert_eq!(rate, 0.5*0.1*0.2);
+        assert_eq!(rate, 1.0/0.5*1.0/0.1*1.0/0.2);
         assert_eq!(path, vec!["A".to_string(), "B".to_string(), "C".to_string(), "D".to_string()]);
 
         let mut tp4 = make_trading_pair_pair("A".to_string(), "E".to_string(), 1.0, 1.0);
-        let mut tp5 = make_trading_pair_pair("E".to_string(), "D".to_string(), 0.5*0.1*0.2 - 0.0001, 1.0);
+        let mut tp5 = make_trading_pair_pair("E".to_string(), "D".to_string(), 0.5*0.1*0.2-0.001, 1.0);
         tps.append(&mut tp4);
         tps.append(&mut tp5);
         let (rate, path) = do_optimize_rate(&tps, &"A".to_string(), &"D".to_string());
-        assert_eq!(rate, 0.5*0.1*0.2-0.0001);
+        assert_eq!(rate, 111.11111);
         assert_eq!(path, vec!["A".to_string(), "E".to_string(), "D".to_string()]);
     }
 
