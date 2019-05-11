@@ -93,7 +93,7 @@ fn optimize_net(trading_pair_file: &str, starting_asset: &str, starting_asset_qu
 
     let (net, trades) = do_optimize_net(&trading_pairs, &starting_asset.to_string(), starting_asset_quantity, &final_asset.to_string());
 
-    println!("Optimal trading results in {} {} from {} {}. The trades are:", net, final_asset, starting_asset_quantity, starting_asset);
+    println!("Optimal trading results in {} {} from {} {}.\nThe trades are:", net, final_asset, starting_asset_quantity, starting_asset);
     for trade in trades {
         println!("{} {} -> {} {}", trade.from_amount, trade.from, trade.to_amount, trade.to);
     }
@@ -152,8 +152,6 @@ fn do_optimize_rate(trading_pairs: &Vec<TradingPair>, starting_asset: &String, f
                 continue;
             }
         }
-        println!("{:?}", connections);
-        println!("{:?}", current_asset);
         for next_asset in connections.get(current_asset).unwrap() {
             if !data.path.contains(next_asset){
                 let incremental_rate = rate_map.get(&(current_asset.to_string(), next_asset.to_string())).unwrap();
@@ -203,7 +201,7 @@ fn get_best_pair(trading_pairs: &Vec<TradingPair>, from: &String, to: &String) -
     if let Some(tp) = trading_pairs.iter().filter(|x| &x.base_asset == from && &x.quote_asset == to).min_by(|a,b| a.rate.partial_cmp(&b.rate).unwrap()) {
         Some(tp.clone())
     } else {
-        println!("Failed to find trading pair {} -> {}", from, to);
+        // eprintln!("Failed to find trading pair {} -> {}", from, to);
         None
     }
 }
@@ -238,7 +236,7 @@ fn do_optimize_net(trading_pairs: &Vec<TradingPair>, starting_asset: &String, st
         }
 
         let (_, path) = do_optimize_rate(&trading_pairs, &data.asset, &final_asset);
-        println!("path={:?}", path);
+
         let tp = get_best_pair(&trading_pairs, &path[0], &path[1]).unwrap();
         let amount_moved = tp.capacity.min(data.amount);
         let trade = Trade{
@@ -265,7 +263,6 @@ fn do_optimize_net(trading_pairs: &Vec<TradingPair>, starting_asset: &String, st
             !(x.exchange == tp.exchange && ((x.quote_asset == tp.quote_asset && x.base_asset  == tp.base_asset)
                                         ||  (x.base_asset  == tp.quote_asset && x.quote_asset == tp.base_asset)))
         }).map(|x| x.clone()).collect();
-        println!("trading_pairs={:?}", trading_pairs);
 
     }
     (net_currency, trades)
