@@ -8,7 +8,7 @@ use clap::{App, Arg, SubCommand};
 use serde::Deserialize;
 
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize,Clone)]
 #[serde(rename_all = "camelCase")]
 struct TradingPair {
     exchange: String,
@@ -70,10 +70,24 @@ fn optimize_rate(trading_pair_file: &str, starting_asset: &str, final_asset: &st
     validate_input(&trading_pairs, starting_asset, final_asset);
 
     println!("Converting {} -> {}", starting_asset, final_asset);
-    let (rate, path) = do_optimize_rate(&trading_pairs, starting_asset.to_string(), final_asset.to_string());
+    let (rate, path) = do_optimize_rate(&trading_pairs, &starting_asset.to_string(), &final_asset.to_string());
 
     println!("Optimal conversion rate: {} {} from 1 {} by taking path:", 1.0/rate, final_asset, starting_asset);
     println!("{}", path.join(" -> "));
+}
+
+fn optimize_net(trading_pair_file: &str, starting_asset: &str, starting_asset_quantity: f32, final_asset: &str) {
+    let trading_pairs = load_trading_pairs(Path::new(trading_pair_file));
+
+    validate_input(&trading_pairs, starting_asset, final_asset);
+
+    println!("Converting {} {} -> {}", starting_asset_quantity, starting_asset, final_asset);
+    let (net, trades) = do_optimize_net(&trading_pairs, &starting_asset.to_string(), starting_asset_quantity, &final_asset.to_string());
+
+    println!("Optimal trading results in {} {} from {} {}. The trades are:", net, final_asset, starting_asset_quantity, starting_asset);
+    for trade in trades {
+        println!("{} {} -> {} {}", trade.from_amount, trade.from, trade.to_amount, trade.to);
+    }
 }
 
 #[derive(Debug)]
@@ -91,29 +105,31 @@ fn is_subset<T: PartialEq>(a: &Vec<T>, b: &Vec<T>) -> bool {
     return true;
 }
 
-fn do_optimize_rate(trading_pairs: &Vec<TradingPair>, starting_asset: String, final_asset: String) -> (f32, Vec<String>) {
-    let connections = get_connections(&trading_pairs);
-
-    // map each trading edge to its *best* rate
-    let rate_map = {
-        let mut rate_map : HashMap<(String, String), f32>= HashMap::new();
-        for tp in trading_pairs.iter() {
-            if let Some(&rate) = rate_map.get(&(tp.base_asset.clone(), tp.quote_asset.clone())) {
-                if tp.rate < rate {
-                    rate_map.insert((tp.base_asset.clone(), tp.quote_asset.clone()), tp.rate);
-                }
-            }
-            else {
+// map each trading edge to its *best* rate
+fn get_rate_map(trading_pairs: &Vec<TradingPair>) -> HashMap<(String, String), f32> {
+    let mut rate_map = HashMap::new();
+    for tp in trading_pairs.iter() {
+        if let Some(&rate) = rate_map.get(&(tp.base_asset.clone(), tp.quote_asset.clone())) {
+            if tp.rate < rate {
                 rate_map.insert((tp.base_asset.clone(), tp.quote_asset.clone()), tp.rate);
             }
         }
-        rate_map
-    };
+        else {
+            rate_map.insert((tp.base_asset.clone(), tp.quote_asset.clone()), tp.rate);
+        }
+    }
+    rate_map
+}
+
+
+fn do_optimize_rate(trading_pairs: &Vec<TradingPair>, starting_asset: &String, final_asset: &String) -> (f32, Vec<String>) {
+    let connections = get_connections(&trading_pairs);
+    let rate_map = get_rate_map(&trading_pairs);
 
     // initialize problem
     let mut memo : HashMap<String, RateOptimData> = HashMap::new();
     let init_data = RateOptimData{
-        path: vec![starting_asset],
+        path: vec![starting_asset.clone()],
         cumulative_rate: 1.0
     };
     let mut to_explore = vec![init_data];
@@ -143,9 +159,88 @@ fn do_optimize_rate(trading_pairs: &Vec<TradingPair>, starting_asset: String, fi
             memo.insert(current_asset.to_string(), data);
         }
     }
-    let final_data = memo.get(&final_asset).unwrap();
+    let final_data = memo.get(final_asset).unwrap();
     (final_data.cumulative_rate, final_data.path.clone())
 }
+
+#[derive(Debug)]
+struct NetOptimData {
+    asset: String,
+    amount : f32,
+}
+
+#[derive(Debug)]
+struct Trade {
+    exchange: String,
+    to: String,
+    to_amount: f32,
+    from: String,
+    from_amount: f32,
+}
+
+// fn remove_best_pair(trading_pairs: &Vec<TradingPair>. from: String, to: String) -> Option<(TradingPair, Vec<TradingPair>>)> {
+//     let best_trading_pair = trading_pairs.iter().filter(|x| x.base_asset == from && x.quote_asset == to).min_by_key(|x| x.rate);
+//     match best_trading_pair {
+//         Some(best_trading_pair) => Some((best_trading_pair, trading_pairs.iter().filter(|x| != best_trading_pair).collect())),
+//         None => None,
+//     }
+// }
+
+fn get_best_pair(trading_pairs: &Vec<TradingPair>, from: &String, to: &String) -> TradingPair {
+    trading_pairs.iter().filter(|x| &x.base_asset == from && &x.quote_asset == to).min_by(|a,b| a.rate.partial_cmp(&b.rate).unwrap()).unwrap().clone()
+}
+
+fn do_optimize_net(trading_pairs: &Vec<TradingPair>, starting_asset: &String, starting_asset_quantity: f32, final_asset: &String) -> (f32, Vec<Trade>) {
+    let mut trading_pairs : Vec<TradingPair> = trading_pairs.iter().map(|x| x.clone()).collect();
+
+    let mut assets_with_movable_currency = vec![NetOptimData{
+        asset: starting_asset.clone(),
+        amount: starting_asset_quantity
+    }];
+
+    let mut trades = Vec::new();
+
+    let mut net_currency = 0.0;
+    while let Some(data) = assets_with_movable_currency.pop() {
+        if data.amount <= 0.0 {
+            continue
+        }
+
+        if &data.asset == final_asset {
+            net_currency += data.amount;
+        }
+        else {
+            let (_, path) = do_optimize_rate(&trading_pairs, &data.asset, &final_asset);
+            let tp = get_best_pair(&trading_pairs, &path[0], &path[1]);
+            let amount_moved = tp.capacity.min(data.amount);
+
+            trades.push(Trade{
+                exchange: tp.exchange.clone(),
+                to: tp.quote_asset.clone(),
+                to_amount: amount_moved/tp.rate,
+                from: tp.base_asset.clone(),
+                from_amount: amount_moved,
+
+            });
+
+            if tp.capacity < data.amount {
+                assets_with_movable_currency.push(NetOptimData{
+                    asset: data.asset.clone(),
+                    amount: data.amount - amount_moved,
+                });
+            }
+            assets_with_movable_currency.push(NetOptimData{
+                asset: tp.quote_asset.clone(),
+                amount: amount_moved/tp.rate,
+            });
+            trading_pairs = trading_pairs.iter().filter(|x| {
+                !(x.exchange == tp.exchange && x.quote_asset == tp.quote_asset && x.base_asset == tp.base_asset)
+            }).map(|x| x.clone()).collect();
+        }
+    }
+    (net_currency, trades)
+}
+
 
 fn find_connected_component(connections: &HashMap<String, HashSet<String>>, to_explore_start: String) -> HashSet<String> {
     let mut have_explored = HashSet::new();
@@ -267,7 +362,12 @@ fn main() {
         ("net", Some(net_matches)) => {
             let quantity = net_matches.value_of("asset quantity").unwrap();
             if let Some(quantity) = quantity.parse::<f32>().ok() {
-                eprintln!("'cryptoptim net' was used with quantity = {:?}", quantity);
+                optimize_net(
+                    net_matches.value_of("trading pairs").unwrap(),
+                    net_matches.value_of("from").unwrap(),
+                    quantity,
+                    net_matches.value_of("to").unwrap()
+                )
             }
             else {
                 eprintln!("Failed to parse \"{}\" into a float!", quantity);
