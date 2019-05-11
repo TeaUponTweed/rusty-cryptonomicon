@@ -32,9 +32,9 @@ e.g.
 ./target/release/cryptoptim rate data/test_data.json B D
 ```
 ```
-Converting B->D
-Optimal conversion rate: 2.3419385 D from 1 B by taking path:
-B -> A -> E -> G -> D
+Converting B -> D
+Optimal conversion rate: 2.4126022 D from 1 B by taking path:
+B -> A -> C -> E -> F -> G -> D
 ```
 
 More specific information can be found by running
