@@ -1,6 +1,10 @@
-use clap::{App, Arg, SubCommand};
+use std::io::prelude::*;
+use std::fmt;
+use std::fs::File;
 use std::path::Path;
 use std::process::exit;
+use clap::{App, Arg, SubCommand};
+
 
 mod util;
 mod rate;
@@ -10,8 +14,6 @@ use util::{validate_input, load_trading_pairs};
 use rate::do_optimize_rate;
 use net::do_optimize_net;
 
-// mod rate;
-// mod net;
 
 fn optimize_rate(trading_pair_file: &str, starting_asset: &str, final_asset: &str) {
     let trading_pairs = load_trading_pairs(Path::new(trading_pair_file));
@@ -39,10 +41,17 @@ fn optimize_net(trading_pair_file: &str, starting_asset: &str, starting_asset_qu
 
     let (net, trades) = do_optimize_net(&trading_pairs, &starting_asset.to_string(), starting_asset_quantity, &final_asset.to_string());
 
-    println!("Optimal trading results in {} {} from {} {}.\nThe trades are:", net, final_asset, starting_asset_quantity, starting_asset);
+    println!("Optimal trading results in {} {} from {} {}.\nThe trades can be found in trades.txt", net, final_asset, starting_asset_quantity, starting_asset);
+
+
+    // write out trades to a file
+    let mut data = String::new();
     for trade in trades {
-        println!("{} {} -> {} {}", trade.from_amount, trade.from, trade.to_amount, trade.to);
+        fmt::write(&mut data,
+            format_args!("{} {} -> {} {} on exchange {}\n", trade.from_amount, trade.from, trade.to_amount, trade.to, trade.exchange)).expect("Unable to write trades data to string!");
     }
+    let mut f = File::create("trades.txt").expect("Unable to create trades file trades.txt");
+    f.write_all(data.as_bytes()).expect("Unable to write trades to trades file!");
 }
 
 
